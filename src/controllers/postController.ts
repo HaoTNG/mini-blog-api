@@ -126,6 +126,67 @@ exports.dislikePost = async (req: Request, res: Response) =>{
   }
 }
 
+//getPosts pagination
+exports.getPosts = async (req: Request, res: Response) => {
+  try{
+    //query from url
+
+    const {
+      keyword,
+      author,
+      minLikes,
+      minDislikes,
+      page="1",
+      limit = "10",
+      sortBy = "createdAt",
+      sortOrder = "desc",
+
+    } = req.query;
+    const filter: any = {};
+    if(keyword){
+      filter.$or = [
+        {title: {$regex: keyword, $options: "i"} },
+        {content: {$regex: keyword, $options: "i"}},
+      ];
+    }
+
+    if(author){
+      filter.author = author;
+    }
+
+    if(minLikes){
+      filter.likes = {$exists: true, $not: {$size: 0}};
+    }
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 10;
+    const skip = (pageNum - 1 )*limitNum;
+
+    const sortOptions: any = {};
+    sortOptions[sortBy as string] = sortOrder === "asc" ? 1 : -1;
+    
+    const posts = await Post.find(filter)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum)
+      .populate("author", "name")
+      .populate("likes", "_id")
+      .populate("dislikes", "_id");
+
+    const total = await Post.countDocuments(filter);
+      res.json({
+        page: pageNum,
+        totalPages: Math.ceil(total/limitNum),
+        totalPosts: total,
+        posts,
+      });
+  }catch(error: any){
+    console.error(error);
+    res.status(500).json({message: "Server error"});
+  }
+}
+
+
 //api for moderator
 
 exports.deletePostByMod = async (req: Request, res: Response) =>{
