@@ -50,11 +50,11 @@ export async function register(req: Request, res: Response)  {
     }
 };
 
-const generateToken = (user: IUser) => {
+const generateAccessTOken = (user: IUser) => {
     return jwt.sign(
         {id: user._id},
         process.env.JWT_SECRET!,
-        {expiresIn: '10d'}
+        {expiresIn: '15m'}
     );
 };
 export async function login(req: Request, res: Response){
@@ -83,7 +83,7 @@ export async function login(req: Request, res: Response){
             })
         }
 
-        const token = generateToken(user);
+        const token = generateAccessTOken(user);
 
         res.status(200).json({
             success: true,
