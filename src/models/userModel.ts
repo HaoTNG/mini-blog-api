@@ -9,7 +9,7 @@ export interface IUser extends Document {
   role: 'user' | 'moderator' | 'admin';
   createdAt: Date;
   updatedAt: Date;
-  refreshToken: string;
+  refreshToken: string | null;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
