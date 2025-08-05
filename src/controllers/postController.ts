@@ -12,6 +12,15 @@ exports.getAllPost = async (req: Request, res: Response) => {
     }
 };
 
+exports.getPostById = async (req: Request, res: Response) =>{
+  try{
+    const post = await Post.findById(req.params.id).populate("author", "username");
+    if(!post) return res.status(404).json({message: "Post not found"})
+  }catch(error){
+    res.status(500).json({message: "server error"});
+  }
+}
+
 exports.createPost = async (req: Request, res: Response) => {
     const {title, content, author } = req.body;
 
