@@ -6,7 +6,7 @@ import connectDB from '../config/db';
 import { errorHandler } from './middlewares/errorMiddleware';
 import morgan from 'morgan';
 import cors from "cors";
-// Load .env
+
 dotenv.config();
 
 

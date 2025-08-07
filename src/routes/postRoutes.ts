@@ -5,8 +5,8 @@ const router = express.Router();
 const postController = require('../controllers/postController');
 
 
-router.route('/post').get(protect, postController.getAllPost).post(protect, postController.createPost);
-router.route('/post/:id').put(protect, postController.updatePost).delete(protect, postController.deletePost).get(protect, postController.getPostById);
+router.route('/post').get( postController.getAllPost).post(protect, postController.createPost);
+router.route('/post/:id').put(protect, postController.updatePost).delete(protect, postController.deletePost).get( postController.getPostById);
 router.route('/post/:id/like').put(protect, postController.likePost);
 router.route('/post/:id/dislike').put(protect, postController.dislikePost);
 router.route('/mod/:id').delete(protect, restrictTo('moderator', 'admin'), postController.deletePostByMod);

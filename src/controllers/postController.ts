@@ -2,10 +2,10 @@
 import mongoose, { mongo } from 'mongoose';
 import Post, { IPost } from '../models/postModel';
 import { Request, Response } from "express";
-
+import { IUser } from '../models/userModel';
 exports.getAllPost = async (req: Request, res: Response) => {
     try {
-        const posts : IPost[] = await Post.find();
+        const posts : IPost[] = await Post.find().populate("author", "_id username");
         res.status(200).json(posts);
     } catch (error: any) {
         res.status(400).json({ message: 'Cannnot get posts', error: error.message });
@@ -14,34 +14,27 @@ exports.getAllPost = async (req: Request, res: Response) => {
 
 exports.getPostById = async (req: Request, res: Response) =>{
   try{
-    const post = await Post.findById(req.params.id).populate("author", "username");
-    if(!post) return res.status(404).json({message: "Post not found"})
+    const post = await Post.findById(req.params.id).populate("author", "_id username");
+    if(!post) return res.status(404).json({message: "Post not found"});
+    res.status(200).json(post);
   }catch(error){
     res.status(500).json({message: "server error"});
   }
 }
 
 exports.createPost = async (req: Request, res: Response) => {
-    const {title, content, author } = req.body;
+  const { title, content } = req.body;
+  const authorId = (req as Request & { user?: IUser }).user?._id;
 
-    if(!title || !content || !author ){
-        return res.status(400).json(
-            {
-                "success": false,
-                "message": "Missing required fields: title, content, author"
-            }
+  if (!title || !content || !authorId) {
+    return res.status(400).json({ success: false, message: "Missing required fields" });
+  }
 
-        );
-    }
-
-    try {
-        const post = await Post.create({ title, content, author });
-        res.status(201).json(post);
-    }catch (error: any) {
-        res.status(500).json({ message: 'Failed to create post', error: error.message });
-    }
-
+  const newPost = await Post.create({ title, content, author: authorId });
+  res.status(201).json(newPost);
 };
+
+
 
 exports.updatePost = async (req: Request, res: Response) => {
   try {
