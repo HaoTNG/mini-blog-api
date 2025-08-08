@@ -11,6 +11,7 @@ exports.createComment = async (req: Request, res: Response) => {
             author: userId,
             post: postId
         })
+        await comment.populate('author', '_id username');
         res.status(201).json(comment);
     }catch(error: any){
         res.status(500).json({
@@ -22,8 +23,8 @@ exports.createComment = async (req: Request, res: Response) => {
 
 exports.getCommentsByPost = async (req: Request, res: Response) => {
     try{
-        const { postId } = req.body;
-        const comments = await Comment.find({post: postId}).populate('author', 'username name');
+        const { postId } = req.params;
+        const comments = await Comment.find({post: postId}).populate('author', '_id username').sort({createdAt: -1});
         res.status(200).json(comments);
     }catch(error: any){
         res.status(500).json({

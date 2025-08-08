@@ -95,6 +95,7 @@ exports.likePost = async (req: Request, res: Response) =>{
     await post.save();
     res.status(200).json({
       message:"like successfully",
+      postId: post._id,
       likes: post.likes.length,
       dislikes: post.dislikes.length
     })
@@ -120,8 +121,9 @@ exports.dislikePost = async (req: Request, res: Response) =>{
     await post.save();
     res.status(200).json({
       message: "dislike successfully",
-      likes: post.likes.length,
-      dislikes: post.dislikes.length
+      postId: post._id,
+      likes: post.likes,
+      dislikes: post.dislikes
     })
   }catch(error: any){
     res.status(500).json({message:"error", error: error.message});
