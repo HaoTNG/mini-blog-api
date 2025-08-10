@@ -18,7 +18,7 @@ exports.updateMe = async (req: Request, res: Response) => {
     const update = req.body;
 
     delete update.role;
-    delete update.password;
+    
 
     try{
         const updateUser = await User.findByIdAndUpdate((req as Request &{user? : IUser}).user?._id,
