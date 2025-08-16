@@ -7,6 +7,8 @@ export interface IPost extends Document {
   topic: string;
   likes: Types.ObjectId[];
   dislikes: Types.ObjectId[];
+  comments: Types.ObjectId[];
+
 }
 
 const topics = [
@@ -34,8 +36,17 @@ const postSchema = new Schema<IPost>(
     },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     dislikes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    comments: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
   },
   { timestamps: true }
+);
+
+postSchema.index(
+  { title: "text", content: "text", topic: "text" },
+  {
+    weights: { title: 5, content: 3, topic: 1 }, 
+    name: "TextIndex_Post"
+  }
 );
 
 const Post = mongoose.model<IPost>("Post", postSchema);

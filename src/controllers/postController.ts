@@ -1,12 +1,12 @@
 import mongoose from 'mongoose';
-import Post, { IPost } from '../models/postModel';
+import Post, { IPost, topics } from '../models/postModel';
 import { Request, Response } from "express";
 import { IUser } from '../models/userModel';
 
 
 exports.getAllPost = async (req: Request, res: Response) => {
     try {
-        const posts: IPost[] = await Post.find().populate("author", "_id username");
+        const posts: IPost[] = await Post.find().populate("author", "_id username").sort({createdAt: -1});
         res.status(200).json(posts);
     } catch (error: any) {
         res.status(400).json({ message: 'Cannot get posts', error: error.message });
@@ -43,10 +43,16 @@ exports.createPost = async (req: Request, res: Response) => {
 
 exports.updatePost = async (req: Request, res: Response) => {
     try {
+        const { topic } = req.body;
+
+        if (topic && !topics.includes(topic)) {
+            return res.status(400).json({ message: "Invalid topic" });
+        }
+
         const updatedPost = await Post.findByIdAndUpdate(
             req.params.id,
             req.body,
-            { new: true }
+            { new: true, runValidators: true }
         );
 
         if (!updatedPost) {
@@ -55,7 +61,7 @@ exports.updatePost = async (req: Request, res: Response) => {
 
         res.status(200).json(updatedPost);
     } catch (error: any) {
-        res.status(500).json({ message: 'Failed to update post', error: error.message });
+        res.status(500).json({ message: "Failed to update post", error: error.message });
     }
 };
 
@@ -183,6 +189,28 @@ exports.getPosts = async (req: Request, res: Response) => {
     } catch (error: any) {
         res.status(500).json({ message: "Server error" });
     }
+};
+
+exports.searchPosts = async (req: Request, res: Response) => {
+  try {
+    const keyword = (req.query.q as string)?.trim();
+    if (!keyword) {
+      return res.status(400).json({ message: "Missing search keyword" });
+    }
+    const result = await Post.find(
+      { $text: { $search: keyword } },
+      { score: { $meta: "textScore" } }
+    )
+      .sort({ score: { $meta: "textScore" }, createdAt: -1 })
+      .populate("author", "_id username");
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    res.status(500).json({
+      message: "Failed to search posts",
+      error: error.message
+    });
+  }
 };
 
 

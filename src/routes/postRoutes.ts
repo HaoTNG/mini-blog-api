@@ -18,7 +18,7 @@ router.delete(
   restrictTo("moderator", "admin"),
   postController.deletePostByMod
 );
-router.get("/posts", postController.getPosts); // pagination
-
+router.get("/posts", postController.getPosts);
+router.get("/search", postController.searchPosts)
 
 export default router;

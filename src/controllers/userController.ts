@@ -1,6 +1,8 @@
 import User, {IUser} from "../models/userModel";
+import Post from "../models/postModel";
 import { Request, Response } from "express";
-import jwt  from "jsonwebtoken";
+import { readdirSync } from "fs";
+
 
 exports.getMe = async (req: Request, res: Response) =>{
     try{
@@ -104,3 +106,27 @@ exports.updateUserRole = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+exports.contributors = async (req: Request, res: Response) =>{
+    try{
+        const users = await User.find({}).select("_id username");
+        const contributions = await Promise.all(
+            users.map(async(user)=>{
+                const postCount = await Post.countDocuments({author: user._id});
+                const commentCount = await Post.countDocuments({author: user._id});
+                const score = postCount*3 + commentCount*1;
+                return {
+                    _id: user._id,
+                    username: user.username,
+                    postCount,
+                    commentCount,
+                    score,
+                }
+            })
+        );
+        const top10 = contributions.sort((a,b) =>b.score-a.score).slice(0,10);
+        res.status(200).json(top10);
+    }catch(error: any){
+        res.status(500).json({message:"Failed to get top contributors", error: error.message});
+    }
+}
