@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import Post, { IPost, topics } from '../models/postModel';
 import { Request, Response } from "express";
-import { IUser } from '../models/userModel';
+import User, { IUser} from '../models/userModel';
 
 
 exports.getAllPost = async (req: Request, res: Response) => {
@@ -35,6 +35,9 @@ exports.createPost = async (req: Request, res: Response) => {
 
     try {
         const newPost = await Post.create({ title, content, author: authorId, topic });
+        await User.findByIdAndUpdate(authorId, {
+            $push: { posts: newPost._id }
+        });
         res.status(201).json(newPost);
     } catch (error: any) {
         res.status(500).json({ message: "Failed to create post", error: error.message });
@@ -73,6 +76,8 @@ exports.deletePost = async (req: Request, res: Response) => {
         if (!deletedPost) {
             return res.status(404).json({ message: "Post not found" });
         }
+
+        await User.findByIdAndUpdate(deletedPost.author, { $pull: { posts: deletedPost._id } });
 
         res.status(200).json({ success: true, message: "Post deleted", data: deletedPost });
     } catch (error: any) {
@@ -220,6 +225,8 @@ exports.deletePostByMod = async (req: Request, res: Response) => {
         if (!post) return res.status(400).json({ message: "Post not found" });
 
         await post.deleteOne();
+
+        await User.findByIdAndUpdate(post.author, {$pull : {posts: post._id}});
         return res.status(200).json({ message: "Post deleted by admin" });
     } catch (error: any) {
         return res.status(400).json({ message: "Failed to delete post", error: error.message });

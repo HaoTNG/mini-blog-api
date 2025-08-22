@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import Comment from "../models/commentModel";
 import mongoose from "mongoose";
 import Post from "../models/postModel";
-
+import User from "../models/userModel"
 // Create comment (support nested)
 exports.createComment = async (req: Request, res: Response) => {
     try {
@@ -31,6 +31,7 @@ exports.createComment = async (req: Request, res: Response) => {
             { $push: { comments: comment._id } },
             { new: true }
         );
+        await User.findByIdAndUpdate(userId, { $push: { comments: comment._id } });
 
         await comment.populate("author", "_id username");
         res.status(201).json(comment);
@@ -97,6 +98,8 @@ exports.deleteComment = async (req: Request, res: Response) => {
             return res.status(403).json({ message: "No permission to delete this comment" });
         }
 
+
+        await User.findByIdAndUpdate(comment.author, { $pull: { comments: comment._id } });
         // Option: delete all replies recursively
         await deleteCommentWithReplies(id);
 
@@ -111,10 +114,17 @@ exports.deleteComment = async (req: Request, res: Response) => {
 
 // Helper: delete comment and all its replies
 async function deleteCommentWithReplies(commentId: string) {
+    const comment = await Comment.findById(commentId);
+    if (!comment) return;
+
+    await User.findByIdAndUpdate(comment.author, { $pull: { comments: comment._id } });
+
+
     const replies = await Comment.find({ parentComment: commentId });
     for (const reply of replies) {
         await deleteCommentWithReplies((reply as any)._id.toString());
     }
+
     await Comment.findByIdAndDelete(commentId);
 }
 
