@@ -6,3 +6,7 @@ dist/
 
 # Env files
 .env
+
+
+uploads/avatar/
+uploads/posts/

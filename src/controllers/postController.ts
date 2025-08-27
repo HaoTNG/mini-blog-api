@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Post, { IPost, topics } from '../models/postModel';
+import Comment from '../models/commentModel';
 import { Request, Response } from "express";
 import User, { IUser} from '../models/userModel';
 
@@ -24,65 +25,118 @@ exports.getPostById = async (req: Request, res: Response) => {
     }
 };
 
+export const getPostByUser = async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id;
 
-exports.createPost = async (req: Request, res: Response) => {
-    const { title, content, topic } = req.body;
-    const authorId = (req as Request & { user?: IUser }).user?._id;
+    const posts = await Post.find({ author: userId })
+      .populate("author", "username avatarUrl") 
+      .sort({ createdAt: -1 }); 
 
-    if (!title || !content || !topic || !authorId) {
-        return res.status(400).json({ success: false, message: "Missing required fields" });
-    }
-
-    try {
-        const newPost = await Post.create({ title, content, author: authorId, topic });
-        await User.findByIdAndUpdate(authorId, {
-            $push: { posts: newPost._id }
-        });
-        res.status(201).json(newPost);
-    } catch (error: any) {
-        res.status(500).json({ message: "Failed to create post", error: error.message });
-    }
+    return res.status(200).json(posts);
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch posts by user", error: error.message });
+  }
 };
 
-exports.updatePost = async (req: Request, res: Response) => {
-    try {
-        const { topic } = req.body;
+export const createPost = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user._id; 
+    const { title, content, topic } = req.body;
 
-        if (topic && !topics.includes(topic)) {
-            return res.status(400).json({ message: "Invalid topic" });
-        }
-
-        const updatedPost = await Post.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true, runValidators: true }
-        );
-
-        if (!updatedPost) {
-            return res.status(404).json({ message: "Post not found" });
-        }
-
-        res.status(200).json(updatedPost);
-    } catch (error: any) {
-        res.status(500).json({ message: "Failed to update post", error: error.message });
+    let images: string[] = [];
+    if (req.files && Array.isArray(req.files)) {
+      images = (req.files as Express.Multer.File[]).map(
+        (file) => `${req.protocol}://${req.get("host")}/uploads/posts/${file.filename}`
+      );
     }
+
+    const post = new Post({
+      title,
+      content,
+      topic,
+      images,
+      author: userId,
+    });
+
+    await post.save();
+    res.status(201).json(post);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to create post" });
+  }
+};
+
+
+export const updatePost = async (req: Request, res: Response) => {
+  try {
+    const { title, content, topic } = req.body;
+
+    let images: string[] = [];
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      images = (req.files as Express.Multer.File[]).map(
+        (file) => `${req.protocol}://${req.get("host")}/uploads/posts/${file.filename}`
+      );
+    }
+
+    const post = await Post.findByIdAndUpdate(
+      req.params.id,
+      {
+        title,
+        content,
+        topic,
+        ...(images.length > 0 && { images }), // chỉ cập nhật nếu có file
+      },
+      { new: true }
+    );
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    res.json(post);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Update post failed" });
+  }
 };
 
 
 exports.deletePost = async (req: Request, res: Response) => {
     try {
-        const deletedPost = await Post.findByIdAndDelete(req.params.id);
+    const deletedPost = await Post.findByIdAndDelete(req.params.id);
 
-        if (!deletedPost) {
-            return res.status(404).json({ message: "Post not found" });
-        }
-
-        await User.findByIdAndUpdate(deletedPost.author, { $pull: { posts: deletedPost._id } });
-
-        res.status(200).json({ success: true, message: "Post deleted", data: deletedPost });
-    } catch (error: any) {
-        res.status(500).json({ message: "Failed to delete post", error: error.message });
+    if (!deletedPost) {
+      return res.status(404).json({ message: "Post not found" });
     }
+
+    await User.findByIdAndUpdate(deletedPost.author, {
+      $pull: { posts: deletedPost._id },
+    });
+
+    const comments = await Comment.find({ post: deletedPost._id });
+    await Comment.deleteMany({ post: deletedPost._id });
+
+    const updateUserPromises = comments.map((comment) =>
+      User.findByIdAndUpdate(comment.author, {
+        $pull: { comments: comment._id },
+      })
+    );
+    await Promise.all(updateUserPromises);
+
+    res.status(200).json({
+      success: true,
+      message: "Post and related comments deleted",
+      data: deletedPost,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      message: "Failed to delete post",
+      error: error.message,
+    });
+  }
 };
 
 
@@ -221,14 +275,29 @@ exports.searchPosts = async (req: Request, res: Response) => {
 
 exports.deletePostByMod = async (req: Request, res: Response) => {
     try {
-        const post = await Post.findById(req.params.id);
-        if (!post) return res.status(400).json({ message: "Post not found" });
-
-        await post.deleteOne();
-
-        await User.findByIdAndUpdate(post.author, {$pull : {posts: post._id}});
-        return res.status(200).json({ message: "Post deleted by admin" });
-    } catch (error: any) {
-        return res.status(400).json({ message: "Failed to delete post", error: error.message });
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
     }
+    await post.deleteOne();
+
+    await User.findByIdAndUpdate(post.author, {
+      $pull: { posts: post._id },
+    });
+    const comments = await Comment.find({ post: post._id });
+    await Comment.deleteMany({ post: post._id });
+
+    const updateUserPromises = comments.map((comment) =>
+      User.findByIdAndUpdate(comment.author, {
+        $pull: { comments: comment._id },
+      })
+    );
+    await Promise.all(updateUserPromises);
+
+    return res.status(200).json({ message: "Post and related comments deleted by admin" });
+  } catch (error: any) {
+    return res.status(500).json({ message: "Failed to delete post", error: error.message });
+  }
 };
+
+

@@ -6,20 +6,22 @@ import connectDB from '../config/db';
 import { errorHandler } from './middlewares/errorMiddleware';
 import morgan from 'morgan';
 import cors from "cors";
-
+import cookieParser from "cookie-parser";
 dotenv.config();
 
 
 const app: Application = express();
 app.use(express.json());
+app.use(cookieParser()); 
 app.use(cors({
-  origin: process.env.FE_PORTAL_URL, // domain frontend
+  origin: process.env.FE_PORTAL_URL, 
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true, 
 }));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 
-// MongoDB connection
 connectDB();
 app.use(morgan(':method :url :status - :response-time ms'));
 app.use(errorHandler);
